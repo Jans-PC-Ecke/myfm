@@ -1,15 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-myfm – Der ultimative Dateimanager für die Konsole
-Tasten: / = Home, & = Suche, h=Hidden, t=neuer Tab, w=Tab schließen,
-c=Kopieren, d=Ausschneiden, p=Einfügen, D=Löschen, r=Umbenennen,
-N=Ordner, 1-9=Tabs, Enter=öffnen, q=beenden.
-SFTP-Mounts per sshfs (passwortfrei via SSH-Key).
-Farben: Ordner blau, Tabs magenta, etc. (wie gewohnt)
-"""
-
 import os
 import sys
 import curses
@@ -28,8 +19,9 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 
 STANDARD_CONFIG = {
     "show_hidden": True,
-    "tabs": ["~", "/home/Nutzerverzeichnis/remote/Server1", "/home/Nutzerverzeichnis/remote/Server2"],
+    "tabs": ["~", "/home/Nutzerverzeichnis/remote/Server1", "/home/Nutzerverzeichnis/remote/Server"],
     "preview_images": True,
+    "editor": "mousepad",   # z.B. nano, vim, gedit, mousepad
     "colors": {
         "directory": 1,      # Blau
         "file": 2,           # Weiß
@@ -247,7 +239,7 @@ class MyFM:
         self.stdscr.addstr(height-3, 0, status[:width-1], curses.color_pair(4))
 
         # ===== Hilfetexte =====
-        help_keys = "/=Home  &=Suche  h=Hidden  t=neuer Tab  w=Tab zu  c=Kopieren  d=Ausschneiden  p=Einfügen  D=Löschen  r=Umbenennen  N=Ordner  1-9=Tabs  Enter=öffnen  q=quit"
+        help_keys = "/=Home  &=Suche  h=Hidden  t=neuer Tab  w=Tab zu  c=Kopieren  d=Ausschneiden  p=Einfügen  D=Löschen  r=Umbenennen  N=Ordner  e=Edit  1-9=Tabs  Enter=öffnen  q=quit"
         self.stdscr.addstr(height-2, 0, help_keys[:width-1], curses.A_DIM)
 
         # ===== Statusmeldung =====
@@ -309,6 +301,7 @@ class MyFM:
             " D              : Ausgewählte Datei löschen",
             " r              : Datei/Ordner umbenennen",
             " N              : Neuen Ordner erstellen",
+            " e              : Markierte Datei mit Editor öffnen",
             " Leertaste      : Datei markieren/auswählen",
             " ?              : Diese Hilfe",
             " F5             : Aktualisieren (reload)",
@@ -554,6 +547,22 @@ class MyFM:
                         self.show_status(f"Ordner {name} erstellt", "green")
                     except Exception as e:
                         self.show_status(f"Fehler: {e}", "red")
+                continue
+
+            # ===== EDITOR (e) =====
+            elif key == ord('e'):
+                if self.cursor < len(items):
+                    selected = items[self.cursor]
+                    full = os.path.join(current_path, selected)
+                    if os.path.isfile(full):
+                        editor = self.config.get("editor", "nano")
+                        try:
+                            subprocess.run([editor, full])
+                            self.show_status(f"Bearbeite {selected}", "green")
+                        except Exception as e:
+                            self.show_status(f"Editor-Fehler: {e}", "red")
+                    else:
+                        self.show_status("Ist ein Ordner – kann nicht bearbeitet werden", "red")
                 continue
 
             # help (?)
