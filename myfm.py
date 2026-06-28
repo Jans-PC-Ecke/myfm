@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+myfm – Der ultimative Dateimanager für die Konsole
+Tasten: / = Home, & = Suche, h=Hidden, t=neuer Tab, w=Tab schließen,
+c=Kopieren, d=Ausschneiden, p=Einfügen, D=Löschen, r=Umbenennen,
+N=Ordner, 1-9=Tabs, Enter=öffnen, q=beenden.
+SFTP-Mounts per sshfs (passwortfrei via SSH-Key).
+Farben: Ordner blau, Tabs magenta, etc. (wie gewohnt)
+"""
+
 import os
 import sys
 import curses
@@ -19,35 +28,16 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 
 STANDARD_CONFIG = {
     "show_hidden": True,
-    "tabs": ["~", "/home/erhardtux/remote/server1", "/home/erhardtux/remote/server2"],
+    "tabs": ["~", "/home/Nutzerverzeichnis/remote/Server1", "/home/Nutzerverzeichnis/remote/Server2"],
     "preview_images": True,
     "colors": {
-        "directory": 1,
-        "file": 2,
-        "selected": 3,
-        "status": 4,
-        "tab": 5,
-        "error": 6,
-        "success": 7,
-    },
-    "keymap": {
-        "quit": ["q", "KEY_F(10)"],
-        "toggle_hidden": ["h"],
-        "new_tab": ["t"],
-        "close_tab": ["w"],
-        "next_tab": ["KEY_RIGHT"],
-        "prev_tab": ["KEY_LEFT"],
-        "go_tab": ["1", "2", "3", "4", "5", "6", "7", "8", "9"],
-        "yank": ["c"],
-        "cut": ["d"],
-        "paste": ["p"],
-        "delete": ["D", "KEY_DC"],
-        "rename": ["r"],
-        "mkdir": ["N"],
-        "help": ["?", "KEY_F(1)"],
-        "open": ["KEY_ENTER", "l"],
-        "mark": [" "],
-        "reload": ["KEY_F(5)"],
+        "directory": 1,      # Blau
+        "file": 2,           # Weiß
+        "selected": 3,       # Gelb
+        "status": 4,         # Cyan
+        "tab": 5,            # Magenta
+        "error": 6,          # Rot
+        "success": 7,        # Grün
     }
 }
 
@@ -85,7 +75,6 @@ class MyFM:
     def __init__(self, stdscr):
         self.stdscr = stdscr
         self.config = load_config()
-        self.keymap = self.config.get("keymap", STANDARD_CONFIG["keymap"])
         self.show_hidden = self.config.get("show_hidden", True)
         self.tabs = [os.path.expanduser(t) for t in self.config.get("tabs", ["~"])]
         self.current_tab = 0
@@ -99,7 +88,7 @@ class MyFM:
         self.status_color = 2
         self.search_results = []  # Liste von (relativer Pfad, voller Pfad)
         self.search_cursor = 0
-        self.search_mode = False  # ob wir in der Suchergebnis-Ansicht sind
+        self.search_mode = False
         self.search_pattern = ""
 
         curses.curs_set(0)
@@ -114,7 +103,7 @@ class MyFM:
         curses.start_color()
         curses.use_default_colors()
         curses.init_pair(1, curses.COLOR_BLUE, -1)    # Verzeichnis
-        curses.init_pair(2, curses.COLOR_ORANGE, -1)   # Datei
+        curses.init_pair(2, curses.COLOR_WHITE, -1)   # Datei
         curses.init_pair(3, curses.COLOR_YELLOW, -1)  # markiert
         curses.init_pair(4, curses.COLOR_CYAN, -1)    # Status
         curses.init_pair(5, curses.COLOR_MAGENTA, -1) # Tabs
@@ -138,11 +127,13 @@ class MyFM:
                     self.show_status(f"Mount fehlgeschlagen: {e.stderr.decode()}", "red")
 
     def get_color(self, item, path):
+        """Gibt die Farbnummer (int) für ein Item zurück."""
+        colors = self.config.get("colors", STANDARD_CONFIG["colors"])
         if item in self.marked:
-            return curses.color_pair(3)
+            return colors.get("selected", 3)
         if os.path.isdir(os.path.join(path, item)):
-            return curses.color_pair(1)
-        return curses.color_pair(2)
+            return colors.get("directory", 1)
+        return colors.get("file", 2)
 
     def list_dir(self, path):
         try:
@@ -178,27 +169,28 @@ class MyFM:
         height, width = self.stdscr.getmaxyx()
         self.stdscr.clear()
 
-        # ===== Tabs (Nummerierung ab 1) =====
+        # ===== Tabs =====
         tab_bar = ""
+        tab_color = self.config.get("colors", STANDARD_CONFIG["colors"]).get("tab", 5)
         for i, tab in enumerate(self.tabs):
             name = os.path.basename(tab) if tab != os.path.expanduser("~") else "~"
             if i == self.current_tab:
                 tab_bar += f" [{i+1}:{name}] "
             else:
                 tab_bar += f" {i+1}:{name} "
-        self.stdscr.addstr(0, 0, tab_bar[:width-1], curses.color_pair(5) | curses.A_REVERSE)
+        self.stdscr.addstr(0, 0, tab_bar[:width-1], curses.color_pair(tab_color) | curses.A_REVERSE)
 
         # ===== Pfad =====
         current_path = self.tabs[self.current_tab]
         self.stdscr.addstr(1, 0, f"📁 {current_path}"[:width-1], curses.color_pair(4))
 
-        # ===== Wenn Suchmodus aktiv, zeige Suchergebnisse als Overlay =====
+        # ===== Wenn Suchmodus aktiv, zeige Suchergebnisse =====
         if self.search_mode and self.search_results:
             self.draw_search_results(height, width)
             self.stdscr.refresh()
             return
 
-        # ===== Dateiliste (normal) =====
+        # ===== Dateiliste =====
         items = self.list_dir(current_path)
         max_y = height - 6
         if self.cursor >= len(items):
@@ -216,11 +208,11 @@ class MyFM:
             line = f"{prefix}{item}"
             color = self.get_color(item, current_path)
             if i == self.cursor:
-                self.stdscr.addstr(2 + i - self.offset, 0, line[:width-1], color | curses.A_REVERSE)
+                self.stdscr.addstr(2 + i - self.offset, 0, line[:width-1], curses.color_pair(color) | curses.A_REVERSE)
             else:
-                self.stdscr.addstr(2 + i - self.offset, 0, line[:width-1], color)
+                self.stdscr.addstr(2 + i - self.offset, 0, line[:width-1], curses.color_pair(color))
 
-        # ===== Vorschau (rechts) =====
+        # ===== Vorschau =====
         if self.preview_visible and width > 60 and items and self.cursor < len(items):
             selected = items[self.cursor]
             full = os.path.join(current_path, selected)
@@ -255,7 +247,7 @@ class MyFM:
         self.stdscr.addstr(height-3, 0, status[:width-1], curses.color_pair(4))
 
         # ===== Hilfetexte =====
-        help_keys = "/=Home  &=Suche  h=Hidden  t=neuer Tab  w=Tab zu  c=Kopieren  d=Ausschneiden  p=Einfügen  D=Löschen  r=Umbenennen  n=Neuer Ordner  1-9=Tabs  Enter=öffnen  q=quit"
+        help_keys = "/=Home  &=Suche  h=Hidden  t=neuer Tab  w=Tab zu  c=Kopieren  d=Ausschneiden  p=Einfügen  D=Löschen  r=Umbenennen  N=Ordner  1-9=Tabs  Enter=öffnen  q=quit"
         self.stdscr.addstr(height-2, 0, help_keys[:width-1], curses.A_DIM)
 
         # ===== Statusmeldung =====
@@ -316,7 +308,7 @@ class MyFM:
             " p              : Kopierte/geschnittene Dateien einfügen",
             " D              : Ausgewählte Datei löschen",
             " r              : Datei/Ordner umbenennen",
-            " n              : Neuen Ordner erstellen",
+            " N              : Neuen Ordner erstellen",
             " Leertaste      : Datei markieren/auswählen",
             " ?              : Diese Hilfe",
             " F5             : Aktualisieren (reload)",
@@ -349,11 +341,9 @@ class MyFM:
             current_path = self.tabs[self.current_tab]
             items = self.list_dir(current_path)
 
-            # ============================================================
-            # SEARCH MODE (wenn aktiv)
-            # ============================================================
+            # ===== SEARCH MODE =====
             if self.search_mode:
-                if key == 27:  # ESC – Suche abbrechen
+                if key == 27:  # ESC
                     self.search_mode = False
                     self.search_results = []
                     continue
@@ -386,14 +376,10 @@ class MyFM:
                         self.search_mode = False
                         self.search_results = []
                     continue
-                # andere Tasten ignorieren im Suchmodus
                 continue
 
-            # ============================================================
-            # NORMALE TASTEN
-            # ============================================================
-
-            # / = Home (lokal)
+            # ===== NORMALE TASTEN =====
+            # / = Home
             if key == ord('/'):
                 self.tabs[self.current_tab] = os.path.expanduser("~")
                 self.cursor = 0
@@ -401,7 +387,7 @@ class MyFM:
                 self.show_status("Home", "green")
                 continue
 
-            # & = Suche starten
+            # & = Suche
             elif key == ord('&'):
                 self.search_mode = True
                 self.search_results = []
@@ -556,7 +542,7 @@ class MyFM:
                 continue
 
             # mkdir (N)
-            elif key == ord('n'):
+            elif key == ord('N'):
                 self.show_status("Neuer Ordner: ", "cyan")
                 self.stdscr.refresh()
                 curses.echo()
@@ -605,19 +591,17 @@ class MyFM:
                     self.offset = self.cursor - (self.stdscr.getmaxyx()[0] - 6) + 1
                 continue
 
-            # ============================================================
-            # SHIFT+d + 1/2 – Server in neuem Tab
-            # ============================================================
+            # ===== SHIFT+d + 1/2 – Server in neuem Tab =====
             elif key == ord('D'):  # Shift+d
                 next_key = self.stdscr.getch()
                 if next_key == ord('1'):
-                    self.tabs.append("/home/erhardtux/remote/server1")
+                    self.tabs.append("/home/erhardtux/remote/Server1")
                     self.current_tab = len(self.tabs) - 1
                     self.cursor = 0
                     self.offset = 0
                     self.show_status("Server1 in neuem Tab", "green")
                 elif next_key == ord('2'):
-                    self.tabs.append("/home/erhardtux/remote/server")
+                    self.tabs.append("/home/erhardtux/remote/Server2")
                     self.current_tab = len(self.tabs) - 1
                     self.cursor = 0
                     self.offset = 0
