@@ -1,0 +1,18 @@
+{
+    "show_hidden": true,
+    "tabs": [
+        "~",
+        "/home/Nutzerverzeichnis-Lokal/remote/Server1",
+        "/home/Nutzerverzeichnis-Lokal/remote/Server2"
+    ],
+    "preview_images": true,
+    "colors": {
+        "directory": 1,
+        "file": 2,
+        "selected": 3,
+        "status": 4,
+        "tab": 5,
+        "error": 6,
+        "success": 7
+    }
+}
