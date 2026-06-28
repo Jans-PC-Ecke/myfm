@@ -2,10 +2,11 @@
     "show_hidden": true,
     "tabs": [
         "~",
-        "/home/Nutzerverzeichnis-Lokal/remote/Server1",
-        "/home/Nutzerverzeichnis-Lokal/remote/Server2"
+        "/home/erhardtux/remote/Server1",
+        "/home/erhardtux/remote/Server2"
     ],
     "preview_images": true,
+    "editor": "mousepad",
     "colors": {
         "directory": 1,
         "file": 2,
