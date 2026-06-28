@@ -2,3 +2,6 @@ Die Hauptdatei mit SSH-Verbindungen, im Prinzip ists ein gut gemeinter Midnight-
 
 die config dazu bitte in .config/myfm ablegen und natürlich IN BEIDEN SKRIPTS die Pfade entsprechend anpassen (für ssh)
 
+Abhängigkeiten: -sshfs (für ssh) 
+                -xdg-utils (um Dateien mit ENTER im Standartprogramm zu öffnen)
+                -chafa (für Bildvorschau in der Konsole)
